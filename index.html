@@ -334,6 +334,21 @@ function save(){
 function starTotal(){ return Object.values(S.stars).reduce((a,b)=>a+b,0); }
 function clearTimer(){ if(S.timer){ clearInterval(S.timer); S.timer=null; } }
 function shuffleArr(a){ const x=a.slice(); for(let i=x.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [x[i],x[j]]=[x[j],x[i]]; } return x; }
+// 组句题：随机打乱词块显示顺序，并确保不会直接摆出正确答案
+function makeChipOrder(q){
+  const items = q.type==='sort' ? q.items : q.words;
+  const base = items.map((_,i)=>i);
+  if(q.type!=='order') return base;
+  const norm = s=>s.replace(/[，。、？！,.\?!\s]/g,'');
+  const answers = [q.a, ...(q.alts||[])].map(norm);
+  let arr = shuffleArr(base);
+  for(let t=0;t<40;t++){
+    const s = norm(arr.map(i=>items[i]).join(''));
+    if(!answers.includes(s)) break;
+    arr = shuffleArr(base);
+  }
+  return arr;
+}
 function heartHtml(){
   let s='';
   for(let i=0;i<3;i++) s += i<S.hearts ? '❤️' : '<span class="off">🖤</span>';
@@ -450,6 +465,8 @@ function renderQ(){
 
   // 选择题/听力：选项随机排序
   if(q.type==='mcq'||q.type==='listen') S.optOrder = shuffleArr(q.opts.map((_,i)=>i));
+  // 组句题：词块随机打乱，且保证不会正好是答案顺序（句子排序题保持原顺序，因解析按编号指代）
+  if(q.type==='order') S.chipOrder = makeChipOrder(q);
   // 阅读题内的子题也各自打乱
   if(q.type==='read') S.readOrder = q.qs.map(s=>shuffleArr(s.opts.map((_,i)=>i)));
 
@@ -516,11 +533,12 @@ function playListen(){
 function orderBlock(q){
   const isSort = q.type==='sort';
   const items = isSort? q.items : q.words;
+  const order = S.chipOrder || items.map((_,i)=>i);
   return `
   <div class="chosen" id="chosen"></div>
   <div class="hint">${isSort?'按顺序点击下面的句子':'点击下面的词语，组成一个句子'}（再点一次可以取消）</div>
-  <div class="pool" id="pool">${items.map((w,i)=>
-    `<button class="chip${isSort?' sent':''}" id="chip${i}" onclick="tapChip(${i})">${w}</button>`).join('')}</div>
+  <div class="pool" id="pool">${order.map(i=>
+    `<button class="chip${isSort?' sent':''}" id="chip${i}" onclick="tapChip(${i})">${items[i]}</button>`).join('')}</div>
   <div style="height:14px"></div>
   <button class="btn btn-main" id="checkBtn" onclick="checkOrder()" disabled>确认答案</button>`;
 }
